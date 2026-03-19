@@ -1,0 +1,5 @@
+{
+  "name": "Gemini Query Bridge",
+  "description": "A simple web interface that takes a query via URL parameter and returns a Gemini-powered response. Ideal for quick AI lookups via URL.",
+  "requestFramePermissions": []
+}
