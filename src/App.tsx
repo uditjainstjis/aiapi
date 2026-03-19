@@ -14,19 +14,42 @@ const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
 export default function App() {
   const [query, setQuery] = useState('');
+  const [apiKey, setApiKey] = useState('');
   const [response, setResponse] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const handleQuery = useCallback(async (text: string) => {
+  // Handle URL parameters on load
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlQuery = params.get('query');
+    const urlKey = params.get('key');
+    
+    if (urlKey) setApiKey(urlKey);
+    
+    if (urlQuery) {
+      setQuery(urlQuery);
+      handleQuery(urlQuery, urlKey || apiKey);
+    }
+  }, []);
+
+  const handleQuery = async (text: string, keyToUse?: string) => {
     if (!text.trim()) return;
     
+    const finalKey = keyToUse || apiKey || process.env.GEMINI_API_KEY || '';
+    
+    if (!finalKey) {
+      setError("Please provide an API key in the input field or URL (?key=...)");
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     setResponse('');
 
     try {
+      const genAI = new GoogleGenAI({ apiKey: finalKey });
       const response = await genAI.models.generateContent({
         model: "gemini-2.0-flash",
         contents: text,
@@ -44,17 +67,7 @@ export default function App() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
-
-  // Handle URL parameters on load
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const urlQuery = params.get('query');
-    if (urlQuery) {
-      setQuery(urlQuery);
-      handleQuery(urlQuery);
-    }
-  }, [handleQuery]);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,6 +75,7 @@ export default function App() {
     // Update URL without refreshing
     const newUrl = new URL(window.location.href);
     newUrl.searchParams.set('query', query);
+    if (apiKey) newUrl.searchParams.set('key', apiKey);
     window.history.pushState({}, '', newUrl);
   };
 
@@ -92,13 +106,26 @@ export default function App() {
         </header>
 
         {/* Input Section */}
-        <section className="mb-8">
+        <section className="mb-8 space-y-4">
+          <div className="relative group">
+            <input
+              type="password"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder="Optional: Enter Gemini API Key (or use ?key=... in URL)"
+              className="w-full h-12 pl-12 pr-6 bg-white border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-sm placeholder:text-gray-400"
+            />
+            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition-colors">
+              <Terminal size={18} />
+            </div>
+          </div>
+
           <form onSubmit={handleSubmit} className="relative group">
             <input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Enter your query or use ?query=... in URL"
+              placeholder="Enter your query..."
               className="w-full h-16 pl-14 pr-6 bg-white border border-gray-200 rounded-2xl shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-lg placeholder:text-gray-400"
             />
             <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition-colors" size={22} />
@@ -193,8 +220,10 @@ export default function App() {
 import requests
 
 query = "what is the color of an apple"
-# You can use ?query=... or just ?...
-url = f"{window.location.origin}/?{query}"
+key = "YOUR_API_KEY"
+
+# Pass key and query in URL
+url = f"{window.location.origin}/?key={key}&{query}"
 response = requests.get(url)
 
 print(response.text) # Returns plain text from Gemini`}</pre>
